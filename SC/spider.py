@@ -6,9 +6,14 @@
 # @File    : spider.py
 # @Software: PyCharm Community Edition
 import json
+import re
+
+import execjs
 import pymongo
 import requests
 from urllib.parse import urlencode
+
+import time
 from config import *
 import csv
 import os
@@ -17,24 +22,42 @@ client = pymongo.MongoClient(MONGO_URL)
 db = client[MONGO_DB]
 db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
 
-headers1 = {
-    'Host': 'sc.gsxt.gov.cn',
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:58.0) Gecko/20100101 Firefox/58.0',
-    'Accept': 'application/json, text/javascript, */*; q=0.01',
-    'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-    'Accept-Encoding': 'gzip, deflate',
-    'Referer': 'http://sc.gsxt.gov.cn/corp-query-entprise-info-xxgg-510000.html',
-    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'X-Requested-With': 'XMLHttpRequest',
-    'Cookie': '__jsluid=8560e8ac2a67615979b4ac053c5f3d5d; UM_distinctid=1643f3a48f661f-0bad67ff17215c8-32634646-1fa400-1643f3a48f756f; CNZZDATA1261033118=1536604988-1530068933-http%253A%252F%252Fsc.gsxt.gov.cn%252F%7C1530085133; __jsl_clearance=1530089443.272|0|hvg%2Bt4GxNtAR6p3T%2FwAHLDPMMyM%3D; SECTOKEN=7101454758092474687; JSESSIONID=C0A38961FF061AB2B5F6720AFAF62891-n2:2; tlb_cookie=S172.16.12.69',
-    'Connection': 'keep-alive'
-}
+# headers1 = {
+#     'Host': 'sc.gsxt.gov.cn',
+#     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:58.0) Gecko/20100101 Firefox/58.0',
+#     'Accept': 'application/json, text/javascript, */*; q=0.01',
+#     'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+#     'Accept-Encoding': 'gzip, deflate',
+#     'Referer': 'http://sc.gsxt.gov.cn/corp-query-entprise-info-xxgg-510000.html',
+#     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+#     'X-Requested-With': 'XMLHttpRequest',
+#     'Cookie': '__jsluid=bed83703dc4fb2be0fed22377b0fa9d5; UM_distinctid=1643ef49916727-0e3f0dc1b388dc-3a760e5d-1fa400-1643ef49917aa0; __jsl_clearance=1530164923.247|0|Adhk9YqEDicTuSDAmIZyKVE8n%2B0%3D; SECTOKEN=7101067530828779211; tlb_cookie=S172.16.12.115; CNZZDATA1261033118=1450370029-1530149935-http%253A%252F%252Fsc.gsxt.gov.cn%252F%7C1530160735; JSESSIONID=D20FC9F7E45A8D64A8C3DF8187CA6FF0-n1:3',
+#     # 'Connection': 'keep-alive'
+# }
+#
+# headers2 = {
+#     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
+#     'Cookie': '__jsluid=bed83703dc4fb2be0fed22377b0fa9d5; SECTOKEN=7098392206164886255; tlb_cookie=S172.16.12.42; UM_distinctid=1643ef49916727-0e3f0dc1b388dc-3a760e5d-1fa400-1643ef49917aa0; CNZZDATA1261033118=1965307862-1530063533-http%253A%252F%252Fsc.gsxt.gov.cn%252F%7C1530079733; __jsl_clearance=1530084311.786|0|edZwMKgIeEQ80hySzqxhZPne%2FDY%3D; JSESSIONID=0737C887F73DAF929119A266B14A5459-n1:34'
+#
+# }
 
-headers2 = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
-    'Cookie': '__jsluid=bed83703dc4fb2be0fed22377b0fa9d5; SECTOKEN=7098392206164886255; tlb_cookie=S172.16.12.42; UM_distinctid=1643ef49916727-0e3f0dc1b388dc-3a760e5d-1fa400-1643ef49917aa0; CNZZDATA1261033118=1965307862-1530063533-http%253A%252F%252Fsc.gsxt.gov.cn%252F%7C1530079733; __jsl_clearance=1530084311.786|0|edZwMKgIeEQ80hySzqxhZPne%2FDY%3D; JSESSIONID=0737C887F73DAF929119A266B14A5459-n1:34'
+Cookie_set = '__jsluid=bed83703dc4fb2be0fed22377b0fa9d5; UM_distinctid=1643ef49916727-0e3f0dc1b388dc-3a760e5d-1fa400-1643ef49917aa0'
 
+
+
+caculat = '''
+var endAllJSStr = "";
+while (z++) try {
+    endAllJSStr = y.replace(/\\b\w+\\b/g, function (y) {
+        return x[f(y, z) - 1] || ("_" + y)
+    });
+    break
+} catch (_) {
+    return "00"
 }
+return endAllJSStr
+'''
+
 
 proxies = {
     'http': 'socks5://127.0.0.1:1080',
@@ -66,24 +89,96 @@ class MongodbConn(object):
 
 
 def get_index(url, draw_num):
+    global Cookie_set
+    i = 10
     data = {
         'draw': draw_num,
         'start': (draw_num-1)*10,
         'length': '10'
     }
-    print(data)
-    response = requests.post(url, data=data, headers=headers2, proxies=proxies)
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
+        'Cookie': Cookie_set
+    }
+
+    print("获取html页面...")
+    response = requests.post(url, data=data, headers=headers)
     while response.status_code == 521:
-        response = requests.post(url, data=data, headers=headers1)
-        print(response.status_code)
+        print("获取cookie...")
+        # 获取521页面，解析cookie值
+        html = response.text
+        p = re.compile('<script>(.*?)</script>', re.S)
+        data = re.findall(p, html)
+        jsStr = data[0]
+
+        #判断多次521
+        if i == 0:
+            time.sleep(10)
+
+        p = re.compile('(.*)while.*?')
+        data = re.findall(p, str(jsStr))
+
+        #添加新的尾部
+        caculat_str = data[0] + str(caculat)
+
+        #调用解析js文件函数
+        data = creatjsfunction(caculat_str)
+
+        #循环判断是否获取到数据
+        while not data:
+            # time.sleep(1)
+            data = creatjsfunction(caculat_str)
+
+        Cookie_set = Cookie_set + '; ' + data
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
+            'Cookie': Cookie_set
+        }
+
+        response = requests.post(url, data=data, headers=headers)
+        i -= 1
 
     if response.status_code == 200:
-        print(response.status_code)
         return response.text
     else:
         return None
 
+
+def creatjsfunction(js):
+    print("解析js文件...")
+
+    # 解析js文件
+    jsfunc = "function testFunc(){%s}" % (str(js))
+    ctx = execjs.compile(jsfunc)
+    searchKey = ctx.call("testFunc")
+
+    # 提取__jsl_clearance字符串 以及新的js代码
+    p1 = re.compile("document.cookie='(.*?)'+", re.S)
+    data_1 = re.findall(p1, searchKey)
+
+    try:
+        p2 = re.compile('.*__jsl_clearance=(.*?)+\(function\(\)(.*?)\)\(\)', re.S)
+        searchKey = re.findall(p2, searchKey)
+        print("获取cookie...")
+        data_2 = searchKey[0][1]
+        # print(data_2)
+
+        # 提取cookie __jsl_clearance 中|后面字符串
+        jsfunc1 = "function testFunc2()%s" % (str(data_2))
+        ctx = execjs.compile(jsfunc1)
+        data_3 = ctx.call("testFunc2")
+    except Exception as e:
+        print('获取cookie错误')
+        return None
+    cookie = data_1[0] + data_3
+    print(cookie)
+    return cookie
+
+
 def get_index_detail(html):
+    print("抓取异常信息...")
+
     result = json.loads(html)
     for item in result['data']:
         noticeTitle = item['noticeTitle']
