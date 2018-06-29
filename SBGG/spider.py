@@ -25,6 +25,30 @@ headers = {
 }
 
 
+class MongodbConn(object):
+    def __init__(self):
+        self.CONN = pymongo.MongoClient(MONGO_URL)
+
+    def run(self):
+        database = MONGO_DB
+        db = self.CONN[database]
+        db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
+        col = db[MONGB_TABLE]
+
+        # query all document
+        documents = col.find()
+
+        csv_file = 'data/' + CSVFile
+        if os.path.exists(csv_file):
+            os.remove(csv_file)
+        for item in documents:
+            csvFile3 = open(csv_file, 'a', newline='')
+            writer2 = csv.writer(csvFile3)
+            writer2.writerow(
+            [item['公布期号'], item['公告日期'], item['公告类型'], item['注册号'], item['申请人'], item['商标名称'], item['图片地址']])
+            csvFile3.close()
+
+
 def get_page(url, offset):
     data = {
         'page': offset,
@@ -33,7 +57,6 @@ def get_page(url, offset):
         'annType': 'TMSDGG',
         'totalYOrN': 'true'
     }
-
 
     url = url + urlencode(data)
     print(url)
@@ -59,7 +82,6 @@ def get_page_detail(html):
         reg_name = item['reg_name']
         tm_name = item['tm_name']
         image = get_image(item['page_no'])
-        # print(image)
 
         yield {
             '公布期号': ann_num,
@@ -106,27 +128,30 @@ def save_to_mongo(result):
         print("出错了")
 
 
-def main():
+def main(i):
     url = 'http://sbgg.saic.gov.cn:9080/tmann/annInfoView/annSearchDG.html?'
-    for i in range(GROUP_START, GROUP_END+1):
-        print(i)
-        html = get_page(url, i)
-        if html:
-            # print(html)
-            data = get_page_detail(html)
-            for item in data:
-                # print(item)
-                csvFile3 = open(CSVFile, 'a', newline='')
-                writer2 = csv.writer(csvFile3)
-                writer2.writerow([item['公布期号'],item['公告日期'], item['公告类型'], item['注册号'], item['申请人'], item['商标名称'], item['图片地址']])
-                csvFile3.close()
-                save_to_mongo(item)
+    print(i)
+    l = []
+    html = get_page(url, i)
+    # print(html)
+    if html:
+        data = get_page_detail(html)
+        for item in data:
+            result = save_to_mongo(item)
+            while result:
+                l.append(item)
+        result = save_to_mongo(item)
+    else:
+        print('页面无数据')
 
 
 if __name__ == '__main__':
-    # groups = [x  for x in range(GROUP_START, GROUP_END+1)]
-    # print(groups)
-    # pool = Pool()
-    # pool.map(main, groups)
+    groups = [x  for x in range(GROUP_START, GROUP_END+1)]
 
-    main()
+    pool = TreadPool(4)
+    for idx,item in enumerate(groups):
+        print(str(idx) + ":" + str(item))
+        pool.apply_async(main, (item,))
+
+    mongo_obj = MongodbConn()
+    mongo_obj.run()

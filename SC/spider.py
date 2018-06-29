@@ -20,30 +20,9 @@ import os
 
 client = pymongo.MongoClient(MONGO_URL)
 db = client[MONGO_DB]
-db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
-
-# headers1 = {
-#     'Host': 'sc.gsxt.gov.cn',
-#     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:58.0) Gecko/20100101 Firefox/58.0',
-#     'Accept': 'application/json, text/javascript, */*; q=0.01',
-#     'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-#     'Accept-Encoding': 'gzip, deflate',
-#     'Referer': 'http://sc.gsxt.gov.cn/corp-query-entprise-info-xxgg-510000.html',
-#     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-#     'X-Requested-With': 'XMLHttpRequest',
-#     'Cookie': '__jsluid=bed83703dc4fb2be0fed22377b0fa9d5; UM_distinctid=1643ef49916727-0e3f0dc1b388dc-3a760e5d-1fa400-1643ef49917aa0; __jsl_clearance=1530164923.247|0|Adhk9YqEDicTuSDAmIZyKVE8n%2B0%3D; SECTOKEN=7101067530828779211; tlb_cookie=S172.16.12.115; CNZZDATA1261033118=1450370029-1530149935-http%253A%252F%252Fsc.gsxt.gov.cn%252F%7C1530160735; JSESSIONID=D20FC9F7E45A8D64A8C3DF8187CA6FF0-n1:3',
-#     # 'Connection': 'keep-alive'
-# }
-#
-# headers2 = {
-#     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
-#     'Cookie': '__jsluid=bed83703dc4fb2be0fed22377b0fa9d5; SECTOKEN=7098392206164886255; tlb_cookie=S172.16.12.42; UM_distinctid=1643ef49916727-0e3f0dc1b388dc-3a760e5d-1fa400-1643ef49917aa0; CNZZDATA1261033118=1965307862-1530063533-http%253A%252F%252Fsc.gsxt.gov.cn%252F%7C1530079733; __jsl_clearance=1530084311.786|0|edZwMKgIeEQ80hySzqxhZPne%2FDY%3D; JSESSIONID=0737C887F73DAF929119A266B14A5459-n1:34'
-#
-# }
+# db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
 
 Cookie_set = '__jsluid=bed83703dc4fb2be0fed22377b0fa9d5; UM_distinctid=1643ef49916727-0e3f0dc1b388dc-3a760e5d-1fa400-1643ef49917aa0'
-
-
 
 caculat = '''
 var endAllJSStr = "";
@@ -58,11 +37,11 @@ while (z++) try {
 return endAllJSStr
 '''
 
-
 proxies = {
     'http': 'socks5://127.0.0.1:1080',
     'https': 'socks5://127.0.0.1:1080'
 }
+
 
 class MongodbConn(object):
 
@@ -72,7 +51,7 @@ class MongodbConn(object):
     def run(self):
         database = MONGO_DB
         db = self.CONN[database]
-        db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
+        # db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
         col = db[MONGB_TABLE]
 
         # query all document
