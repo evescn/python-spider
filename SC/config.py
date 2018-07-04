@@ -15,7 +15,7 @@ Name = '成都-经营异常名录公告-' + str(datetime.date.today())
 CSVFile=Name + '.csv'
 
 
-MongoDB数据信息
+# MongoDB数据信息
 MONGO_URL = 'localhost'
 MONGO_DB = 'SC-经营异常'
 MONGB_TABLE = CSVFile

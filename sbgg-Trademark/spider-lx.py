@@ -1,22 +1,34 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time    : 18-6-25 下午2:34
+# @Time    : 18-6-26 下午3:20
 # @Author  : Evescn
 # @Site    : 
+# @File    : spider-lx.py
+# @Software: PyCharm Community Edition
+
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Time    : 18-6-25 下午2:34
+# @Author  : Evescn
+# @Site    :
 # @File    : spider.py
 # @Software: PyCharm Community Edition
 import csv
 import json
+import os
 
+import multiprocessing
 import pymongo
 import requests
-from multiprocessing import Pool
+# from multiprocessing import  Pool
+
+from multiprocessing.dummy import Pool as  TreadPool
 from requests.exceptions import RequestException
 from pyquery import PyQuery as pq
 from urllib.parse import urlencode
 from config import *
 
-client = pymongo.MongoClient(MONGO_URL)
+client = pymongo.MongoClient(MONGO_URL, connect=False)
 db = client[MONGO_DB]
 # db.authenticate("ACCOUNT", "PASSWORD")
 
@@ -24,15 +36,15 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'
 }
 
-
 class MongodbConn(object):
+
     def __init__(self):
         self.CONN = pymongo.MongoClient(MONGO_URL)
 
     def run(self):
         database = MONGO_DB
         db = self.CONN[database]
-        # db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
+        # db.authenticate("username", "password")
         col = db[MONGB_TABLE]
 
         # query all document
@@ -44,8 +56,7 @@ class MongodbConn(object):
         for item in documents:
             csvFile3 = open(csv_file, 'a', newline='')
             writer2 = csv.writer(csvFile3)
-            writer2.writerow(
-            [item['公布期号'], item['公告日期'], item['公告类型'], item['注册号'], item['申请人'], item['商标名称'], item['图片地址']])
+            writer2.writerow([item['公布期号'],item['公告日期'], item['公告类型'], item['注册号'], item['申请人'], item['商标名称'], item['图片地址']])
             csvFile3.close()
 
 
@@ -58,8 +69,9 @@ def get_page(url, offset):
         'totalYOrN': 'true'
     }
 
+
     url = url + urlencode(data)
-    print(url)
+    # print(url)
     try:
         response = requests.post(url, headers=headers)
         if response.status_code == 200:
@@ -75,6 +87,7 @@ def get_page(url, offset):
 def get_page_detail(html):
     result = json.loads(html)
     for item in result['rows']:
+        id = item['id']
         ann_num = item['ann_num']
         ann_date = item['ann_date']
         ann_type = item['ann_type']
@@ -84,6 +97,7 @@ def get_page_detail(html):
         image = get_image(item['page_no'])
 
         yield {
+            'id': id,
             '公布期号': ann_num,
             '公告日期': ann_date,
             '公告类型': ann_type,
@@ -118,14 +132,18 @@ def get_image(page_no):
 
 def save_to_mongo(result):
     try:
-        # if db[MONGB_TABLE].update({'注册号': result['注册号']}, {'$set': result}, True):
-        #     print("更新数据库成功：", result['注册号'])
-        if db[MONGB_TABLE].insert(result):
-            print("保存到MongoDB数据库成功：", result)
+        if db[MONGB_TABLE].update({'id': result['id']}, {'$set': result}, True):
+            # print("更新数据库成功：", result['id'])
+            return 0
+        elif db[MONGB_TABLE].insert(result):
+            # print("保存到MongoDB数据库成功：", result)
+            return 0
         else:
             print("保存到MongoDB数据库失败", result)
+            return 1
     except Exception:
         print("出错了")
+        return 1
 
 
 def main(i):
@@ -137,21 +155,26 @@ def main(i):
     if html:
         data = get_page_detail(html)
         for item in data:
+            # print(item)
+            # l.append(item)
             result = save_to_mongo(item)
             while result:
-                l.append(item)
-        result = save_to_mongo(item)
+                print(item)
+                result = save_to_mongo(item)
     else:
         print('页面无数据')
 
-
 if __name__ == '__main__':
     groups = [x  for x in range(GROUP_START, GROUP_END+1)]
+    # print(groups)
+    # print(groups[2])
+
+    # pool = Pool()
+    # pool.map(main, groups)
 
     pool = TreadPool(4)
     for idx,item in enumerate(groups):
-        print(str(idx) + ":" + str(item))
         pool.apply_async(main, (item,))
 
-    mongo_obj = MongodbConn()
-    mongo_obj.run()
+    pool.close()
+    pool.join()

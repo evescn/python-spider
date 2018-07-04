@@ -103,11 +103,13 @@ def get_index(url, draw_num):
 
         #调用解析js文件函数
         data = creatjsfunction(caculat_str)
+        print("data:", data)
 
         #循环判断是否获取到数据
-        while not data:
-            # time.sleep(1)
+        while data == '':
+            time.sleep(1)
             data = creatjsfunction(caculat_str)
+            print("while-data:", data)
 
         Cookie_set = Cookie_set + '; ' + data
         headers = {

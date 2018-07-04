@@ -7,10 +7,12 @@
 # @Software: PyCharm Community Edition
 import csv
 import json
+import os
 
 import pymongo
 import requests
 from multiprocessing import Pool
+from multiprocessing.dummy import Pool as  TreadPool
 from requests.exceptions import RequestException
 from pyquery import PyQuery as pq
 from urllib.parse import urlencode
@@ -18,7 +20,7 @@ from config import *
 
 client = pymongo.MongoClient(MONGO_URL)
 db = client[MONGO_DB]
-# db.authenticate("ACCOUNT", "PASSWORD")
+db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'
@@ -26,13 +28,14 @@ headers = {
 
 
 class MongodbConn(object):
+
     def __init__(self):
         self.CONN = pymongo.MongoClient(MONGO_URL)
 
     def run(self):
         database = MONGO_DB
         db = self.CONN[database]
-        # db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
+        db.authenticate(ACCOUNT, PASSWORD, MONGO_DB)
         col = db[MONGB_TABLE]
 
         # query all document
@@ -58,6 +61,7 @@ def get_page(url, offset):
         'totalYOrN': 'true'
     }
 
+
     url = url + urlencode(data)
     print(url)
     try:
@@ -75,6 +79,7 @@ def get_page(url, offset):
 def get_page_detail(html):
     result = json.loads(html)
     for item in result['rows']:
+        # id = item['id']
         ann_num = item['ann_num']
         ann_date = item['ann_date']
         ann_type = item['ann_type']
@@ -82,8 +87,10 @@ def get_page_detail(html):
         reg_name = item['reg_name']
         tm_name = item['tm_name']
         image = get_image(item['page_no'])
+        # print(image)
 
         yield {
+            # 'id': id,
             '公布期号': ann_num,
             '公告日期': ann_date,
             '公告类型': ann_type,
@@ -94,14 +101,27 @@ def get_page_detail(html):
         }
 
 
+def get_image_id():
+    data = {
+        'annNum': AnnNum,
+        'annTypecode': 'TMSDGG',
+    }
+
+    url = 'http://sbgg.saic.gov.cn:9080/tmann/annInfoView/selectInfoidBycode.html?' + urlencode(data)
+
+    response = requests.get(url, headers=headers)
+    return response.text
+
+
 def get_image(page_no):
+    ImageID = get_image_id()
     data = {
         'pageNum': page_no,
         'id': ImageID,
         'flag': 1
     }
     url = 'http://sbgg.saic.gov.cn:9080/tmann/annInfoView/imageView.html?' + urlencode(data)
-    response = requests.get(url, headers=headers)
+    response = requests.post(url, headers=headers)
 
     if page_no < 4:
         num = page_no - 1
@@ -121,11 +141,17 @@ def save_to_mongo(result):
         # if db[MONGB_TABLE].update({'注册号': result['注册号']}, {'$set': result}, True):
         #     print("更新数据库成功：", result['注册号'])
         if db[MONGB_TABLE].insert(result):
-            print("保存到MongoDB数据库成功：", result)
+            # print("保存到MongoDB数据库成功：", result)
+            return None
         else:
             print("保存到MongoDB数据库失败", result)
     except Exception:
         print("出错了")
+
+
+def requestDatas(needClearAll=False):
+    if needClearAll:
+        db[MONGB_TABLE].drop()
 
 
 def main(i):
@@ -140,7 +166,7 @@ def main(i):
             result = save_to_mongo(item)
             while result:
                 l.append(item)
-        result = save_to_mongo(item)
+        save_to_mongo(item)
     else:
         print('页面无数据')
 
@@ -148,10 +174,17 @@ def main(i):
 if __name__ == '__main__':
     groups = [x  for x in range(GROUP_START, GROUP_END+1)]
 
-    pool = TreadPool(4)
-    for idx,item in enumerate(groups):
-        print(str(idx) + ":" + str(item))
-        pool.apply_async(main, (item,))
+    try:
+        requestDatas(True)
+        pool = TreadPool(4)
+        for idx,item in enumerate(groups):
+            # print(str(idx) + ":" + str(item))
+            pool.apply_async(main, (item,))
 
-    mongo_obj = MongodbConn()
-    mongo_obj.run()
+        pool.close()
+        pool.join()
+
+        mongo_obj = MongodbConn()
+        mongo_obj.run()
+    except :
+        pass
