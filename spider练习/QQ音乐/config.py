@@ -6,8 +6,8 @@
 # @File    : config.py
 # @Software: PyCharm Community Edition
 
-MONGO_URL = 'localhost'
+MONGO_URL = '10.120.10.198'
 MONGO_DB = 'TaoBao'
 MONGB_TABLE = 'meishi'
 
-SERVICE_ARGS = ['--load-images=false', '--disk-cache=true']
+#ERVICE_ARGS = ['--load-images=false', '--disk-cache=true']
