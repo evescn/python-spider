@@ -4,7 +4,7 @@ import pymongo
 from multiprocessing import Pool
 import re
 
-client = pymongo.MongoClient('10.120.10.198')
+client = pymongo.MongoClient('192.168.0.100')
 db = client['MaoYan']
 
 def get_page(url):
@@ -38,7 +38,7 @@ def get_cinemas_page_datail(response):
         movie_name = item('.movie-name').text()
         movie_score = item('.score').text()
         data = re.split(r'[:\n]', item('.movie-desc').text())
-        print(data)
+        # print(data)
         movie_time = None
         movie_type = None
         movie_actor = None
@@ -61,12 +61,30 @@ def get_cinemas_page_datail(response):
             'movie_actor': movie_actor
         }
 
+def get_time_page_datail(response):
+    temp_data = pq(response)
+    time_data = temp_data('.container .show-list .show-date').items()
+    for item in time_data:
+        # print(item)
+        time = item('.date-item').text()
+        # print(time)
+        if '今天'not in time:
+            time = re.split(r' ', time)
+            num = len(time)/2
+            print(time)
+            key = 0
+            while key <= len(time):
+                yield {
+                    'time': time[key+1]
+                }
+                key = key + 2
+    return None
 
 def sava_to_mongodb_cinemas(table_name, result):
     try:
-        if db[table_name].update({'movie_name': result['movie_name']}, {'$set': result}, True):
+        if db[table_name].update_one({'cinemas': result['cinemas']}, {'$set': result}, True):
             print("更新数据库成功：", result['cinemas'])
-        if db[table_name].insert(result):
+        elif db[table_name].insert_one(result):
             print("保存到MongoDB数据库成功：", result)
         else:
             print("保存到MongoDB数据库失败", result)
@@ -75,9 +93,9 @@ def sava_to_mongodb_cinemas(table_name, result):
 
 def sava_to_mongodb_movie(table_name, result):
     try:
-        if db[table_name].update({'movie_name': result['movie_name'], 'cinemas_address_id': result['cinemas_address_id']}, {'$set': result}, True):
+        if db[table_name].update_one({'movie_name': result['movie_name'], 'cinemas_address_id': result['cinemas_address_id']}, {'$set': result}, True):
             print("更新数据库成功：", result['movie_name'])
-        elif db[table_name].insert(result):
+        elif db[table_name].insert_one(result):
             print("保存到MongoDB数据库成功：", result)
         else:
             print("保存到MongoDB数据库失败", result)
@@ -86,14 +104,14 @@ def sava_to_mongodb_movie(table_name, result):
 
 def main(offset):
     url = 'https://maoyan.com/cinemas?offset=' + str(offset)
-    print(url)
+    # print(url)
     response = get_page(url)
     cinemas_address = get_page_datail(response)
     for item in cinemas_address:
-        print(item)
+        # print(item)
         sava_to_mongodb_cinemas('cinemas_address', item)
-        time_repsonse = get_page(item['cinemas_play_url'])
-        movie_info = get_cinemas_page_datail(time_repsonse)
+        temp_repsonse = get_page(item['cinemas_play_url'])
+        movie_info = get_cinemas_page_datail(temp_repsonse)
         for item_movie in movie_info:
             # print(item_movie)
             ObjectId = db['cinemas_address'].find({'cinemas': item['cinemas']}, {'item': 1, 'status': 1})
@@ -102,6 +120,10 @@ def main(offset):
                 item_movie['cinemas_address_id'] = str(item_id['_id'])
                 print(item_movie)
                 sava_to_mongodb_movie('movie_info', item_movie)
+        time_info = get_time_page_datail(temp_repsonse)
+        # print(time_info)
+        for item_time in time_info:
+            print(item_time)
 
 if __name__ == '__main__':
     # pool = Pool()
